@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import { getPictures } from '../API/API';
 import Searchbar from './Searchbar/Searchbar';
@@ -8,59 +8,61 @@ import Loader from './Loader/Loader';
 
 const perPage = 12;
 
-export default class App extends Component {
-  state = {
-    imageName: '',
-    images: null,
-    page: 1,
-    visibleLoadMore: false,
-    visibleLoader: false,
-  };
+export default function App() {
+  const [imageName, setImageName] = useState('');
+  const [images, setImages] = useState(null);
+  const [page, setPage] = useState(1);
+  const [visibleLoadMore, setVisibleLoadMore] = useState(false);
+  const [visibleLoader, setVisibleLoader] = useState(false);
 
-  async componentDidUpdate(prevProps, prevState) {
-    const { imageName, page } = this.state;
+  useEffect(() => {
+    if (imageName === '') {
+      return;
+    }
 
-    if (prevState.imageName !== imageName || prevState.page !== page) {
-      try {
-        this.setState({ visibleLoader: true });
+    setVisibleLoader(true);
 
-        const { totalHits, hits } = await getPictures(imageName, page);
+    getPictures(imageName, page)
+      .then(response => {
+        const { totalHits, hits } = response;
 
         if (totalHits === 0) {
           toast.error('Sorry, there are no images matching your search query.');
-          this.setState({ visibleLoadMore: false, visibleLoader: false });
+          setVisibleLoadMore(false);
+          setVisibleLoader(false);
           return;
         } else {
-          this.setState(prevState => ({
-            images: page === 1 ? hits : [...prevState.images, ...hits],
-            visibleLoadMore: page * perPage < totalHits,
-          }));
-          this.setState({ visibleLoader: false });
+          setImages(prevImages =>
+            page === 1 ? hits : [...prevImages, ...hits]
+          );
+          setVisibleLoader(false);
+          setVisibleLoadMore(page * perPage < totalHits);
         }
-      } catch (error) {
+      })
+      .catch(error => {
         toast.error(error);
-      }
+      });
+  }, [imageName, page]);
+
+  const onFormSubmit = inputImageName => {
+    if (inputImageName !== imageName) {
+      setImageName(inputImageName);
+      setImages(null);
+      setPage(1);
     }
-  }
-
-  onFormSubmit = imageName => {
-    this.setState({ imageName, page: 1, images: null });
   };
 
-  onLoadMoreClick = () => {
-    this.setState(prevState => ({ page: prevState.page + 1 }));
+  const onLoadMoreClick = () => {
+    setPage(page + 1);
   };
 
-  render() {
-    const { images, visibleLoadMore, visibleLoader } = this.state;
-    return (
-      <div>
-        <ToastContainer autoClose={2500} />
-        <Searchbar onSubmit={this.onFormSubmit} />
-        {images && <ImageGallery images={images} />}
-        {visibleLoadMore && <Button onCLick={this.onLoadMoreClick} />}
-        {visibleLoader && <Loader />}
-      </div>
-    );
-  }
+  return (
+    <div>
+      <ToastContainer autoClose={2500} />
+      <Searchbar onSubmit={onFormSubmit} />
+      {images && <ImageGallery images={images} />}
+      {visibleLoadMore && <Button onCLick={onLoadMoreClick} />}
+      {visibleLoader && <Loader />}
+    </div>
+  );
 }
